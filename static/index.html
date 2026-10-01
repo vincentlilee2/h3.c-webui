@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>H3 WebUI · Local Apple Silicon</title>
+  <link rel="stylesheet" href="/static/style.css?v=7" />
+</head>
+<body>
+  <main>
+    <section class="form-panel">
+      <!-- 模式切换 Tab -->
+      <div class="tabs">
+        <button class="tab active" data-mode="t2v">单次出片</button>
+        <button class="tab" data-mode="interactive">交互模式</button>
+      </div>
+
+      <!-- 单次模式表单 -->
+      <form id="job-form">
+        <label>
+          <textarea name="prompt" rows="3" required placeholder="A cute 5-year-old girl with short black hair in low pigtails and big sparkling eyes, wearing a white shirt and red plaid dress, kneels on a sunlit grassy meadow under a giant old oak tree at golden hour. She gently pets a chubby orange-and-white tabby cat with green eyes. The cat stands up and walks toward the camera while the girl stands up and watches with a warm smile. Soft warm sunlight, long tree shadows, lush green grass with small wildflowers, dreamy distant forest. 3D Pixar/Disney animation style, cinematic lighting, shallow depth of field, smooth camera dolly-in.">A cute 5-year-old girl with short black hair in low pigtails and big sparkling eyes, wearing a white shirt and red plaid dress, kneels on a sunlit grassy meadow under a giant old oak tree at golden hour. She gently pets a chubby orange-and-white tabby cat with green eyes. The cat stands up and walks toward the camera while the girl stands up and watches with a warm smile. Soft warm sunlight, long tree shadows, lush green grass with small wildflowers, dreamy distant forest. 3D Pixar/Disney animation style, cinematic lighting, shallow depth of field, smooth camera dolly-in.</textarea>
+        </label>
+
+        <!-- 视频秒数滑杆(单次模式用) -->
+        <div id="seconds-control">
+          <div class="control-row">
+            <label for="seconds-range">
+              <span id="seconds-display" class="value-display">1 秒</span>
+            </label>
+            <input type="range" id="seconds-range" name="seconds" min="1" max="20" value="1" step="1" />
+            <div class="range-hint">1-20 秒 (24 fps · 输出帧数 <span id="frames-display">24</span>)</div>
+          </div>
+        </div>
+
+        <fieldset class="mode-pills">
+          <label class="radio">
+            <input type="radio" name="mode" value="t2v" checked />
+            <span>仅文生视频 (text → video)</span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="mode" value="firstlast" />
+            <span>首尾帧控制 (first / last frame)</span>
+          </label>
+        </fieldset>
+
+        <div id="frame-inputs" class="hidden">
+          <label>
+            <span>首帧图片</span>
+            <input type="file" name="first_frame" accept="image/*" />
+          </label>
+          <label>
+            <span>尾帧图片</span>
+            <input type="file" name="last_frame" accept="image/*" />
+          </label>
+        </div>
+
+        <!-- ============ 简单两级:本地 / 云端 按钮 + 预设下拉 ============ -->
+        <div class="pill-group" id="engine-pills">
+          <button type="button" class="pill active" data-engine="local">🖥️  本地 h3.c</button>
+          <button type="button" class="pill" data-engine="cloud">☁️  云端 mmx</button>
+        </div>
+
+        <label>
+          <select name="preset" id="preset-select">
+            <!-- 本地 h3.c · 10 个本地预设 -->
+            <optgroup label="🖥️  本地 h3.c · Apple Silicon" data-engine="local">
+              <option value="fast">Fast (4 steps, 512², SSD)</option>
+              <option value="fast_int8" selected>Fast+int8 (推荐 · M5 TensorOps)</option>
+              <option value="fast_int8_16x9">Fast+int8 16:9 (4 steps · 768x448)</option>
+              <option value="balanced">Balanced (20 steps, 512², BF16)</option>
+              <option value="balanced_int8">Balanced+int8 (推荐高质量)</option>
+              <option value="quality_ssd">Quality SSD (768² 正方形 · 30min/1s)</option>
+              <option value="quality_landscape_ssd">Quality Landscape (30 steps, 1024x512 2:1)</option>
+              <option value="wide">Wide (20 steps, 864x480, SSD)</option>
+              <option value="portrait_int8">Portrait+int8 (20 steps, 448x768 9:16)</option>
+              <option value="portrait_int8_short">Portrait+int8 (12 steps, 448x832 short)</option>
+              <option value="landscape_int8">Landscape+int8 (20 steps, 768x448 16:9)</option>
+            </optgroup>
+            <!-- 云端 mmx · Hailuo-2.3 (TokenPlan) 标准/快速 + 首尾帧,H3 (Pay-as-you-go) 后续
+                 SEF 警告:传 --last-frame 会让 mmx 自动切到 Hailuo-02(不是 2.3),前端必须提示 -->
+            <optgroup label="☁️  云端 mmx" data-engine="cloud">
+              <option value="cloud_hailuo_std_t2v" selected>Hailuo-2.3 标准 · 纯文 (1080p · TokenPlan)</option>
+              <option value="cloud_hailuo_fast_t2v">Hailuo-2.3 快速 · 纯文 (768p · TokenPlan)</option>
+              <option value="cloud_hailuo_std_sef" data-warn="SEF 模式会自动切到 Hailuo-02(不是 2.3)">Hailuo-2.3 标准 · 首尾帧 (⚠️ 实际跑 Hailuo-02)</option>
+              <option value="cloud_hailuo_fast_sef" data-warn="Fast+SEF 不被官方支持,大概率失败">Hailuo-2.3 快速 · 首尾帧 (⚠️ Fast 不支持 SEF)</option>
+              <option value="cloud_h3_std_t2v">MiniMax-H3 · 纯文 (Pay-as-you-go)</option>
+            </optgroup>
+          </select>
+        </label>
+
+        <!-- 云端 API key 弹窗(首次点云端预设时弹出,记住后不再弹) -->
+        <div id="api-key-modal" class="modal hidden">
+          <div class="modal-content">
+            <h3 id="api-key-modal-title">配置 API key</h3>
+            <p id="api-key-modal-desc" class="muted">输入 mmx CLI 的 API key,我会存在浏览器本地,不再重复弹。</p>
+            <input type="password" id="api-key-input" placeholder="sk-cp-... 或 sk-..." />
+            <p class="muted" style="font-size:11px;">
+              ⚠️ 实际后端用 <code>~/.mmx/config.json</code> 里的 key。
+              这里存的 key 仅作"已配置"标识,提示你 mmx CLI 配了没。
+              想换 key 跑 <code>mmx auth login --api-key &lt;新key&gt;</code>。
+            </p>
+            <div class="modal-actions">
+              <button type="button" id="api-key-cancel">取消</button>
+              <button type="button" id="api-key-clear" class="hidden">清除已存</button>
+              <button type="button" id="api-key-save">保存并使用</button>
+            </div>
+            <p id="api-key-status" class="muted"></p>
+          </div>
+        </div>
+
+        <details>
+          <summary>高级 · 随机种子</summary>
+          <label>
+            <span>种子 (留空 = h3 默认随机)</span>
+            <input type="number" name="seed" placeholder="例如 42" min="0" />
+          </label>
+        </details>
+
+        <button type="submit" id="submit-btn">提交生成任务</button>
+        <span id="status-text"></span>
+      </form>
+
+      <!-- 交互模式 UI -->
+      <div id="interactive-panel" class="hidden">
+        <div class="interactive-banner">
+          <div class="banner-line">
+            <span class="dot"></span>
+            <strong>交互模式</strong>
+            <span class="muted">— 每个 prompt 仍启动独立 h3 进程（暂未实现 h3 常驻 socket）</span>
+          </div>
+          <p class="muted">提交 prompt 后,模型在每个任务间重新加载。当前会话内所有出片共享秒数 / 预设 / 帧模式设置。</p>
+        </div>
+
+        <div id="session-summary" class="session-summary">
+          <div class="summary-row">
+            <span>会话 ID:</span><code id="session-id-display">—</code>
+          </div>
+          <div class="summary-row">
+            <span>本次会话任务:</span><span id="session-job-count">0</span>
+          </div>
+          <button type="button" id="end-session-btn" class="ghost-btn">结束会话</button>
+        </div>
+
+        <label>
+          <span>提示词 (直接发到 h3)</span>
+          <textarea id="interactive-prompt" rows="3" placeholder="A small bird perched on a branch..."></textarea>
+        </label>
+
+        <div class="control-row">
+          <label for="interactive-seconds">
+            <span>秒数</span>
+            <span id="interactive-seconds-display" class="value-display">1 秒</span>
+          </label>
+          <input type="range" id="interactive-seconds" min="1" max="20" value="1" step="1" />
+        </div>
+
+        <label>
+          <span>预设</span>
+          <select id="interactive-preset">
+            <optgroup label="🖥️  本地 h3.c" data-engine="local">
+              <option value="fast">Fast (BF16)</option>
+              <option value="fast_int8" selected>Fast+int8 (推荐)</option>
+              <option value="fast_int8_16x9">Fast+int8 16:9 (4 steps · 768x448)</option>
+              <option value="balanced">Balanced (BF16)</option>
+              <option value="balanced_int8">Balanced+int8 (推荐高质量)</option>
+              <option value="quality_ssd">Quality SSD (768² 正方形)</option>
+              <option value="wide">Wide (864x480, SSD)</option>
+              <option value="portrait_int8">Portrait+int8 (448x768 9:16)</option>
+              <option value="portrait_int8_short">Portrait+int8 (12 steps, 448x832 short)</option>
+              <option value="landscape_int8">Landscape+int8 (768x448 16:9)</option>
+            </optgroup>
+            <optgroup label="☁️  云端 mmx" data-engine="cloud">
+              <option value="cloud_hailuo_std_t2v">Hailuo-2.3 标准 · 纯文</option>
+              <option value="cloud_hailuo_fast_t2v">Hailuo-2.3 快速 · 纯文</option>
+              <option value="cloud_hailuo_std_sef">Hailuo-2.3 标准 · 首尾帧 (⚠️ 实际跑 Hailuo-02)</option>
+              <option value="cloud_hailuo_fast_sef">Hailuo-2.3 快速 · 首尾帧 (⚠️ Fast 不支持 SEF)</option>
+              <option value="cloud_h3_std_t2v">MiniMax-H3 · 纯文</option>
+            </optgroup>
+          </select>
+        </label>
+
+        <div class="interactive-controls">
+          <button type="button" id="interactive-submit">▶ 出片</button>
+          <details>
+            <summary>! 命令参考</summary>
+            <div id="interactive-commands-list" class="cmd-list"></div>
+            <p class="muted">注意:这些命令在 h3 原生交互模式（stdin 模拟 tty）中有效。本 WebUI 暂未桥接 tty，因此命令**不会**发送到 h3。如需原生命令，请在终端直接运行 <code>~/work/h3.c/h3 -d ~/work/h3.c/MiniMax-H3</code>。</p>
+          </details>
+        </div>
+      </div>
+
+      <div class="history">
+        <h2>历史任务</h2>
+        <ul id="job-list"><li class="empty">暂无任务</li></ul>
+      </div>
+    </section>
+
+    <section class="output-panel">
+      <div class="status-card" id="status-card">
+        <!-- 右上角退出按钮(清理残留进程):点击 → 二次确认 → 后端自杀 -->
+        <button type="button" id="exit-btn" class="status-card-exit-btn"
+                title="关闭后端并清理残留进程" aria-label="退出">✕ 退出</button>
+        <div class="status-left">
+          <div class="status-line">
+            <span class="label">当前任务:</span>
+            <span id="current-job-id">—</span>
+            <span id="current-job-status" class="status-badge">idle</span>
+            <button type="button" id="cancel-btn" class="cancel-btn hidden">取消</button>
+          </div>
+          <div class="status-line">
+            <span class="label">排队:</span>
+            <span id="queue-info" class="muted">无</span>
+            <span class="label">清理策略:</span>
+            <span id="cleanup-info" class="muted">—</span>
+          </div>
+          <div class="status-line">
+            <span class="label">耗时:</span>
+            <span id="elapsed">0.0s</span>
+            <span class="label">预估生成用时:</span>
+            <span id="phase">—</span>
+          </div>
+          <div class="status-line">
+            <span class="label">参数:</span>
+            <span id="job-params" class="muted">—</span>
+          </div>
+          <div class="bar"><div id="bar-fill"></div></div>
+        </div>
+        <aside class="status-right" aria-label="环境信息">
+          <div class="status-right-line"><span id="health-summary">连接中...</span></div>
+          <div class="status-right-line muted"><span id="live-trace">(空闲)</span></div>
+        </aside>
+      </div>
+
+      <div class="video-card">
+        <div class="video-wrap">
+          <video id="video" controls preload="metadata"></video>
+          <div class="video-placeholder" id="video-placeholder">提交任务后这里显示视频</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js?v=9"></script>
+</body>
+</html>

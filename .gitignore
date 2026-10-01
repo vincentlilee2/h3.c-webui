@@ -1,0 +1,25 @@
+# ---------- 运行时数据(用户本机实跑历史,无 PII 但不进仓) ----------
+data/predictions.json
+logs/*.log
+uploads/*
+!uploads/.gitkeep
+
+# ---------- 用户的真实作品(按用户偏好:不进仓) ----------
+# 注意:glob 模式下 *.png / *.jpg / *.mp4 一律忽略,但要放行 .gitkeep 占位文件
+outputs/*.mp4
+outputs/preview/*.png
+outputs/preview/*.jpg
+outputs/preview/*.jpeg
+outputs/preview/*.webp
+!outputs/.gitkeep
+!outputs/preview/.gitkeep
+
+# ---------- 通用 ----------
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+.env
