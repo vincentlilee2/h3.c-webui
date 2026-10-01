@@ -1,5 +1,7 @@
 # H3 WebUI
 
+
+
 Apple Silicon (M5) 本地 H3 视频生成的 Web 界面,基于 [antirez/h3.c](https://github.com/antirez/h3.c)(MiniMax-H3 推理引擎)。
 
 可选接入 [MiniMax 平台](https://platform.minimaxi.com) 的 mmx CLI,使用云端 Hailuo-2.3 / MiniMax-H3 引擎(走 TokenPlan 或 Pay-as-you-go 配额)。
